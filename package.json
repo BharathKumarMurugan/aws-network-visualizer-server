@@ -1,0 +1,32 @@
+{
+    "name": "aws-network-visualizer",
+    "version": "1.0.0",
+    "description": "AWS Network Visualizer",
+    "main": "index.js",
+    "scripts": {
+        "dev": "nodemon --exec babel-node ./src/index.js",
+        "start": "nodemon node ./src/index.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "aws",
+        "nodejs",
+        "network",
+        "visualizer"
+    ],
+    "author": "Bharath Kumar Murugan",
+    "license": "MIT",
+    "dependencies": {
+        "apollo-server-express": "^2.19.2",
+        "aws-sdk": "^2.834.0",
+        "body-parser": "^1.19.0",
+        "cors": "^2.8.5",
+        "express": "^4.17.1"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.13.14",
+        "@babel/node": "^7.13.13",
+        "@babel/preset-env": "^7.13.12",
+        "nodemon": "^2.0.7"
+    }
+}
