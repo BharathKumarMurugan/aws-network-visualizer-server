@@ -5,6 +5,7 @@ import cors from "cors";
 import util from "util";
 import appConfig from "./config/appConfig";
 import networks from "./router/networks";
+import logger from "morgan";
 
 // global.__basedir = __dirname;
 
@@ -12,6 +13,7 @@ const app = express();
 const PORT = appConfig._api_port;
 
 app.use(cors());
+app.use(logger("dev"));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -23,4 +25,3 @@ app.get("/", (req, res) => {
 app.use("/api/networks", networks);
 
 app.listen(PORT, (req, res) => console.log(`Server is listening at ${PORT}`));
-

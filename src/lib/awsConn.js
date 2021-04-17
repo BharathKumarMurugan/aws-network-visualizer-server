@@ -10,4 +10,3 @@ AWS.config.update({ region: appConfig._aws_region });
 
 export default AWS;
 // module.exports = AWS;
-

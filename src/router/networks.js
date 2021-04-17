@@ -31,13 +31,13 @@ const getAllVpcs = async () => {
             } of data) {
                 let item = {};
                 item["Id"] = VpcId;
+                item["Name"] =
+                    Tags[index] != null ? Tags[index]["Value"] : null;
                 item["CidrBlock"] = CidrBlock;
                 item["Tenancy"] = InstanceTenancy;
                 item["DhcpOptionsId"] = DhcpOptionsId;
                 item["State"] = State;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
-                item["Name"] =
-                    Tags[index] != null ? Tags[index]["Value"] : null;
                 vpcList.push(item);
             }
             return vpcList;
@@ -63,7 +63,7 @@ const getVpc = async (vpcID) => {
     try {
         const { Vpcs: data } = await EC2.describeVpcs(params).promise();
         if (data.length > 0) {
-            let vpc = [];
+            let vpcList = [];
             for (const {
                 VpcId,
                 Tags,
@@ -74,16 +74,16 @@ const getVpc = async (vpcID) => {
             } of data) {
                 let item = {};
                 item["Id"] = VpcId;
+                item["Name"] =
+                    Tags[index] != null ? Tags[index]["Value"] : null;
                 item["CidrBlock"] = CidrBlock;
                 item["Tenancy"] = InstanceTenancy;
                 item["DhcpOptionsId"] = DhcpOptionsId;
                 item["State"] = State;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
-                item["Name"] =
-                    Tags[index] != null ? Tags[index]["Value"] : null;
-                vpc.push(item);
+                vpcList.push(item);
             }
-            return vpc;
+            return vpcList;
         } else return "0 VPCs";
     } catch (err) {
         return {
@@ -122,14 +122,14 @@ const getSubnet = async (vpcID) => {
             } of data) {
                 let item = {};
                 item["Id"] = SubnetId;
+                item["Name"] =
+                    Tags[index] != null ? Tags[index]["value"] : null;
                 item["AZ"] = AvailabilityZone;
                 item["CidrBlock"] = CidrBlock;
                 item["State"] = State;
                 item["AvailableIP"] = AvailableIpAddressCount;
                 item["MapPublicIpOnLaunch"] = MapPublicIpOnLaunch;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
-                item["Name"] =
-                    Tags[index] != null ? Tags[index]["value"] : null;
                 subnetList.push(item);
             }
             return subnetList;
@@ -236,6 +236,60 @@ const getNetworkAcl = async (vpcId) => {
     }
 };
 /**
+ * Fetch All Security Groups
+ */
+const getAllSecurityGroups = async (vpcId) => {
+    const params = {
+        DryRun: false,
+        Filters: [{ Name: "vpc-id", Values: [vpcId] || null }],
+    };
+    try {
+        let { SecurityGroups: data } = await EC2.describeSecurityGroups(
+            params
+        ).promise();
+        if (data.length > 0) {
+            let securityGroups = [];
+            for (const { GroupId, GroupName, Description } of data) {
+                let item = {};
+                item["Id"] = GroupId;
+                item["Name"] = GroupName;
+                item["Description"] = Description;
+                securityGroups.push(item);
+            }
+            return securityGroups;
+        } else return "0 Security Groups";
+    } catch (err) {
+        return {
+            requestID: err.requestId,
+            statusCode: err.statusCode,
+            message: err.code,
+            time: err.time,
+        };
+    }
+};
+/**
+ * Fetch specific Security Group
+ */
+const getSecurityGroups = async (securityGroupId) => {
+    const params = {
+        DryRun: false,
+        Filters: [{ Name: "group-id", Values: [securityGroupId] || null }],
+    };
+    try {
+        let { SecurityGroups: data } = await EC2.describeSecurityGroups(
+            params
+        ).promise();
+        return data;
+    } catch (err) {
+        return {
+            requestID: err.requestId,
+            statusCode: err.statusCode,
+            message: err.code,
+            time: err.time,
+        };
+    }
+};
+/**
  * Fetch NAT Gateway
  */
 const getNatGateway = async (vpcID) => {
@@ -270,36 +324,50 @@ networks.get("/vpc/all", async (req, res) => {
     }
 });
 
-//sample --> delete later
-networks.get("/vpc:vpcId", async (req, res) => {
+networks.get("/vpc:vpcId?", async (req, res) => {
     try {
         const data = await getVpc(req.query.vpcId);
+
         res.status(200).send(data);
     } catch (err) {
         res.send(err);
     }
 });
 
-networks.get("/subnet:vpcId", async (req, res) => {
+networks.get("/subnet:vpcId?", async (req, res) => {
     try {
         const data = await getSubnet(req.query.vpcId);
         res.status(200).send(data);
-        console.log("I'm in subnet API call");
     } catch (err) {
         res.send(err);
     }
 });
 
-networks.get("/igw:vpcId", async (req, res) => {
+networks.get("/igw:vpcId?", async (req, res) => {
     try {
         const data = await getInternetGateway(req.query.vpcId);
         res.status(200).send(data);
-        console.log("I'm in IGW API call");
     } catch (err) {
         res.send(err);
     }
 });
+networks.get("/vpc/sg:vpcId?", async (req, res) => {
+    try {
+        const data = await getAllSecurityGroups(req.query.vpcId);
+        res.status(200).send(data);
+    } catch (err) {
+        res.send(err);
+    }
+});
+/*networks.get("/sg:sgId?", async (req, res) => {
+    try {
+        const data = await getSecurityGroups(req.query.sgId);
+        res.status(200).send(data);
+    } catch (err) {
+        res.send(err);
+    }
+});
+*/
 
 export default networks;
 // module.exports = router;
-
