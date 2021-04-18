@@ -324,6 +324,16 @@ networks.get("/vpc/all", async (req, res) => {
     }
 });
 
+networks.get("/vpc/:vpcId", async(req, res) => {
+    try{
+        const data = await Promise.all([getVpc(req.query.vpcId), getSubnet(req.query.vpcId), getInternetGateway(req.query.vpcId), getAllSecurityGroups(req.query.vpcId)]);
+        res.send(200).send(data);
+    }catch(err){
+        res.send(err);
+    }
+})
+
+//delete later
 networks.get("/vpc:vpcId?", async (req, res) => {
     try {
         const data = await getVpc(req.query.vpcId);
