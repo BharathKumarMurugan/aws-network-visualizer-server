@@ -31,13 +31,13 @@ const getAllVpcs = async () => {
             } of data) {
                 let item = {};
                 item["Id"] = VpcId;
+                const index = Tags.findIndex((tag) => tag["Key"] === "Name");
                 item["Name"] =
                     Tags[index] != null ? Tags[index]["Value"] : null;
                 item["CidrBlock"] = CidrBlock;
                 item["Tenancy"] = InstanceTenancy;
                 item["DhcpOptionsId"] = DhcpOptionsId;
                 item["State"] = State;
-                const index = Tags.findIndex((tag) => tag["Key"] === "Name");
                 vpcList.push(item);
             }
             return vpcList;
@@ -74,13 +74,13 @@ const getVpc = async (vpcID) => {
             } of data) {
                 let item = {};
                 item["Id"] = VpcId;
+                const index = Tags.findIndex((tag) => tag["Key"] === "Name");
                 item["Name"] =
                     Tags[index] != null ? Tags[index]["Value"] : null;
                 item["CidrBlock"] = CidrBlock;
                 item["Tenancy"] = InstanceTenancy;
                 item["DhcpOptionsId"] = DhcpOptionsId;
                 item["State"] = State;
-                const index = Tags.findIndex((tag) => tag["Key"] === "Name");
                 vpcList.push(item);
             }
             return vpcList;
@@ -122,14 +122,14 @@ const getSubnet = async (vpcID) => {
             } of data) {
                 let item = {};
                 item["Id"] = SubnetId;
+                const index = Tags.findIndex((tag) => tag["Key"] === "Name");
                 item["Name"] =
-                    Tags[index] != null ? Tags[index]["value"] : null;
+                    Tags[index] != null ? Tags[index]["Value"] : null;
                 item["AZ"] = AvailabilityZone;
                 item["CidrBlock"] = CidrBlock;
                 item["State"] = State;
                 item["AvailableIP"] = AvailableIpAddressCount;
                 item["MapPublicIpOnLaunch"] = MapPublicIpOnLaunch;
-                const index = Tags.findIndex((tag) => tag["Key"] === "Name");
                 subnetList.push(item);
             }
             return subnetList;
@@ -324,26 +324,20 @@ networks.get("/vpc/all", async (req, res) => {
     }
 });
 
-networks.get("/vpc/:vpcId", async(req, res) => {
-    try{
-        const data = await Promise.all([getVpc(req.query.vpcId), getSubnet(req.query.vpcId), getInternetGateway(req.query.vpcId), getAllSecurityGroups(req.query.vpcId)]);
-        res.send(200).send(data);
-    }catch(err){
-        res.send(err);
-    }
-})
-
-//delete later
-networks.get("/vpc:vpcId?", async (req, res) => {
+networks.get("/vpc/:vpcId?", async (req, res) => {
     try {
-        const data = await getVpc(req.query.vpcId);
-
+        console.log("I'm here");
+        const data = await Promise.all([
+            getVpc(req.query.vpcId),
+            getSubnet(req.query.vpcId),
+            getInternetGateway(req.query.vpcId),
+            getAllSecurityGroups(req.query.vpcId),
+        ]);
         res.status(200).send(data);
     } catch (err) {
         res.send(err);
     }
 });
-
 networks.get("/subnet:vpcId?", async (req, res) => {
     try {
         const data = await getSubnet(req.query.vpcId);
