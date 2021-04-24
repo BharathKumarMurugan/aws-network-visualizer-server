@@ -5,6 +5,7 @@ import cors from "cors";
 import util from "util";
 import appConfig from "./config/appConfig";
 import networks from "./router/networks";
+import sts from "./router/sts";
 import logger from "morgan";
 
 // global.__basedir = __dirname;
@@ -23,5 +24,5 @@ app.get("/", (req, res) => {
     res.send("Hello World");
 });
 app.use("/api/networks", networks);
-
+app.use("/api/security", sts);
 app.listen(PORT, (req, res) => console.log(`Server is listening at ${PORT}`));
