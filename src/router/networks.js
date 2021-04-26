@@ -35,8 +35,7 @@ const getAllVpcs = async () => {
                 item["State"] = State;
                 item["Id"] = VpcId;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
-                item["Name"] =
-                    Tags[index] != null ? Tags[index]["Value"] : null;
+                item["Name"] = Tags[index] != null ? Tags[index]["Value"] : "-";
                 item["CidrBlock"] = CidrBlock;
                 item["Tenancy"] = InstanceTenancy;
                 item["DhcpOptionsId"] = DhcpOptionsId;
@@ -79,8 +78,7 @@ const getVpc = async (vpcID) => {
                 item["State"] = State;
                 item["Id"] = VpcId;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
-                item["Name"] =
-                    Tags[index] != null ? Tags[index]["Value"] : null;
+                item["Name"] = Tags[index] != null ? Tags[index]["Value"] : "-";
                 item["CidrBlock"] = CidrBlock;
                 item["Tenancy"] = InstanceTenancy;
                 item["DhcpOptionsId"] = DhcpOptionsId;
@@ -127,8 +125,7 @@ const getSubnet = async (vpcID) => {
                 let item = {};
                 item["Id"] = SubnetId;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
-                item["Name"] =
-                    Tags[index] != null ? Tags[index]["Value"] : null;
+                item["Name"] = Tags[index] != null ? Tags[index]["Value"] : "-";
                 item["AZ"] = AvailabilityZone;
                 item["CidrBlock"] = CidrBlock;
                 item["State"] = State;
@@ -170,8 +167,7 @@ const getRouteTables = async (vpcID) => {
                 let item = {};
                 item["Id"] = RouteTableId;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
-                item["Name"] =
-                    Tags[index] != null ? Tags[index]["Value"] : null;
+                item["Name"] = Tags[index] != null ? Tags[index]["Value"] : "-";
                 const routesDestination = () => {
                     return Routes.map((r) =>
                         r["DestinationCidrBlock"]
@@ -239,8 +235,7 @@ const getInternetGateway = async (vpcID) => {
                 item["State"] = State;
                 item["Id"] = InternetGatewayId;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
-                item["Name"] =
-                    Tags[index] != null ? Tags[index]["Value"] : null;
+                item["Name"] = Tags[index] != null ? Tags[index]["Value"] : "-";
 
                 igwList.push(item);
             }
@@ -386,8 +381,7 @@ const getNatGateway = async (vpcID) => {
                 item["State"] = State;
                 item["Id"] = NatGatewayId;
                 const index = Tags.findIndex((tag) => tag["Key" === "Name"]);
-                item["Name"] =
-                    Tags[index] != null ? Tags[index]["Value"] : null;
+                item["Name"] = Tags[index] != null ? Tags[index]["Value"] : "-";
                 const natAllocPubIP = () => {
                     return NatGatewayAddresses.map((nat) => nat["PublicIp"]);
                 };
@@ -509,7 +503,7 @@ const getAllComputeInstances = async (vpcID) => {
                     const index = Tags.findIndex(
                         (tag) => tag["Key"] === "Name"
                     );
-                    item["Name"] = Tags[index] ? Tags[index]["Value"] : null;
+                    item["Name"] = Tags[index] ? Tags[index]["Value"] : "-";
                     item["PrivateIpAddress"] = PrivateIpAddress;
                     item["PublicIpAddress"] = PublicIpAddress
                         ? PublicIpAddress
