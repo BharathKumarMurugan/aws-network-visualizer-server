@@ -6,8 +6,9 @@ import appConfig from "../config/appConfig";
 
 const networks = express.Router();
 
-const EC2 = new AWS.EC2({ apiVersion: appConfig._aws_api_version });
-var RDS = new AWS.RDS({ apiVersion: appConfig._aws_api_version });
+const EC2 = new AWS.EC2({ apiVersion: appConfig._aws_ec2_api_version });
+var RDS = new AWS.RDS({ apiVersion: appConfig._aws_rds_api_version });
+var ELBv2 = new AWS.ELBv2({ apiVersion: appConfig._aws_elbv2_api_version });
 
 // const dataPath = __basedir + path.sep + "data";
 
@@ -31,6 +32,7 @@ const getAllVpcs = async () => {
                 State,
             } of data) {
                 let item = {};
+                item["State"] = State;
                 item["Id"] = VpcId;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
                 item["Name"] =
@@ -38,7 +40,7 @@ const getAllVpcs = async () => {
                 item["CidrBlock"] = CidrBlock;
                 item["Tenancy"] = InstanceTenancy;
                 item["DhcpOptionsId"] = DhcpOptionsId;
-                item["State"] = State;
+
                 vpcList.push(item);
             }
             return vpcList;
@@ -74,6 +76,7 @@ const getVpc = async (vpcID) => {
                 State,
             } of data) {
                 let item = {};
+                item["State"] = State;
                 item["Id"] = VpcId;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
                 item["Name"] =
@@ -81,7 +84,7 @@ const getVpc = async (vpcID) => {
                 item["CidrBlock"] = CidrBlock;
                 item["Tenancy"] = InstanceTenancy;
                 item["DhcpOptionsId"] = DhcpOptionsId;
-                item["State"] = State;
+
                 vpcList.push(item);
             }
             return vpcList;
@@ -232,12 +235,13 @@ const getInternetGateway = async (vpcID) => {
             let igwList = [];
             for (const { InternetGatewayId, Tags, Attachments } of data) {
                 let item = {};
+                let [{ State }] = Attachments;
+                item["State"] = State;
                 item["Id"] = InternetGatewayId;
                 const index = Tags.findIndex((tag) => tag["Key"] === "Name");
                 item["Name"] =
                     Tags[index] != null ? Tags[index]["Value"] : null;
-                let [{ State }] = Attachments;
-                item["State"] = State;
+
                 igwList.push(item);
             }
             return igwList;
@@ -379,6 +383,7 @@ const getNatGateway = async (vpcID) => {
                 Tags,
             } of data) {
                 let item = {};
+                item["State"] = State;
                 item["Id"] = NatGatewayId;
                 const index = Tags.findIndex((tag) => tag["Key" === "Name"]);
                 item["Name"] =
@@ -392,12 +397,76 @@ const getNatGateway = async (vpcID) => {
                 item["PublicIP"] = natAllocPubIP();
                 item["PrivateIP"] = natAllocPvtIP();
                 item["SubnetId"] = SubnetId;
-                item["State"] = State;
+
                 natList.push(item);
             }
             return natList;
         } else return [];
     } catch (err) {
+        return {
+            requestID: err.requestId,
+            statusCode: err.statusCode,
+            message: err.code,
+            time: err.time,
+        };
+    }
+};
+/**
+ * Fetch NACL of specific VPC
+ */
+const getNetworkACLs = async (vpcID) => {
+    const params = {
+        DryRun: false,
+        Filters: [
+            {
+                Name: "vpc-id",
+                Values: [vpcID],
+            },
+        ],
+    };
+    try {
+        const { NetworkAcls: data } = await EC2.describeNetworkAcls(
+            params
+        ).promise();
+        if (data.length > 0) {
+            let networkAcls = [];
+            for (const {
+                NetworkAclId,
+                Tags,
+                Associations,
+                Entries,
+                IsDefault,
+            } of data) {
+                let item = {};
+                item["Id"] = NetworkAclId;
+                const index = Tags.findIndex((tag) => tag["Key"] === "Name");
+                item["Name"] = Tags[index] ? Tags[index]["Value"] : "-";
+                const naclSubnets = () => {
+                    return Associations.map((nacl) => nacl["SubnetId"]);
+                };
+                item["Subnets"] = naclSubnets();
+                item["Default"] = IsDefault;
+                const countEgress = () => {
+                    let count = 0;
+                    return Entries.forEach((nacl, index) => {
+                        if (nacl["Egress"]) return count + index;
+                    });
+                };
+                const countIngress = () => {
+                    let count = 0;
+                    return Entries.forEach((nacl, index) => {
+                        if (!nacl["Egress"]) return count + index;
+                    });
+                };
+                item["EgressCount"] = countEgress();
+                item["IngressCount"] = countIngress();
+                console.log(item);
+                networkAcls.push(item);
+            }
+            return networkAcls;
+        } else return [];
+    } catch (err) {
+        console.error(err);
         return {
             requestID: err.requestId,
             statusCode: err.statusCode,
@@ -435,6 +504,7 @@ const getAllComputeInstances = async (vpcID) => {
                     SubnetId,
                 } of Instances) {
                     let item = {};
+                    item["State"] = State["Name"];
                     item["Id"] = InstanceId;
                     const index = Tags.findIndex(
                         (tag) => tag["Key"] === "Name"
@@ -445,7 +515,7 @@ const getAllComputeInstances = async (vpcID) => {
                         ? PublicIpAddress
                         : null;
                     item["SubnetId"] = SubnetId;
-                    item["State"] = State["Name"];
+
                     instnaceList.push(item);
                 }
             }
@@ -471,7 +541,6 @@ const getVpcPeeringConnection = async (vpcID) => {
         let {
             VpcPeeringConnections: data,
         } = await EC2.describeVpcPeeringConnections(params).promise();
-        console.log(data);
         let vpcPeeringList = [];
         for (const {
             VpcPeeringConnectionId,
@@ -494,7 +563,7 @@ const getVpcPeeringConnection = async (vpcID) => {
                 vpcPeeringList.push(item);
             }
         }
-        console.log("vpc peer list: ", vpcPeeringList);
+        // console.log("vpc peer list: ", vpcPeeringList);
         return vpcPeeringList;
     } catch (err) {
         return {
@@ -521,22 +590,24 @@ const getAllRDSInstances = async (vpc_ID) => {
                 DBInstanceIdentifier,
                 Engine,
                 DBInstanceStatus,
-                DBSubnetGroup: { VpcId },
+                DBSubnetGroup,
             } of data) {
-                console.log("I'm inside FOR");
+                // console.log("I'm inside FOR");
                 let item = {};
-                console.log("VPC: ", VpcId);
-                if (VpcId === vpc_ID) {
-                    console.log("I'm inside IF");
+                // console.log("VPC: ", VpcId);
+
+                // console.log("I'm inside IF");
+                if (DBSubnetGroup !== undefined || DBSubnetGroup !== null) {
                     item["Name"] = DBInstanceIdentifier;
                     item["Engine"] = Engine;
                     item["Status"] = DBInstanceStatus;
-                    // console.log("item: ", item);
+                    item["VpcID"] = DBSubnetGroup;
                     rdsList.push(item);
                 }
+
                 // console.log("rds list: ", rdsList);
             }
-            console.log("rds inside: ", rdsList);
+            // console.log("rds inside: ", rdsList);
         }
         console.log("rds outside: ", rdsList);
         return rdsList.length > 0 ? rdsList : [];
@@ -550,6 +621,105 @@ const getAllRDSInstances = async (vpc_ID) => {
         };
     }
 };
+/**
+ * Fetch Load Balancers
+ */
+const getAllLoadBalancers = async () => {
+    const params = {};
+    try {
+        let { LoadBalancers: data } = await ELBv2.describeLoadBalancers(
+            params
+        ).promise();
+        if (data.length > 0) {
+            let loadBalancers = [];
+            for (const {
+                DNSName,
+                CanonicalHostedZoneId,
+                LoadBalancerName,
+                Scheme,
+                VpcId,
+                State: { Code },
+                Type,
+                AvailabilityZones,
+                SecurityGroups,
+                IpAddressType,
+            } of data) {
+                let item = {};
+                item["State"] = Code;
+                item["Name"] = LoadBalancerName;
+                item["Type"] = Type;
+                item["Scheme"] = Scheme;
+                item["DNS"] = DNSName;
+                item["VPC"] = VpcId;
+                const lbAZName = () => {
+                    return AvailabilityZones.map((lb) => lb["ZoneName"]);
+                };
+                const lbAZSubnet = () => {
+                    return AvailabilityZones.map((lb) => lb["SubnetId"]);
+                };
+                item["AZs"] = lbAZName();
+                item["Subnets"] = lbAZSubnet();
+                item["SecurityGroups"] = SecurityGroups;
+                item["IPType"] = IpAddressType;
+
+                loadBalancers.push(item);
+            }
+            return loadBalancers;
+        } else return [];
+    } catch (err) {
+        console.error(err);
+        return {
+            requestID: err.requestId,
+            statusCode: err.statusCode,
+            message: err.code,
+            time: err.time,
+        };
+    }
+};
+/**
+ * Fetch All Transit Gateway
+ */
+const getAllTransitGateways = async () => {
+    const params = {};
+    try {
+        let { TransitGateways: data } = await EC2.describeTransitGateways(
+            params
+        ).promise();
+        console.log("Transit: ", data);
+        if (data.length > 0) {
+            let transitGateways = [];
+            for (const {
+                TransitGatewayId,
+                State,
+                Tags,
+                Options: { TransitGatewayCidrBlocks },
+                Options: { DnsSupport },
+            } of data) {
+                let item = {};
+                item["State"] = State;
+                item["Id"] = TransitGatewayId;
+                const index = Tags.findIndex((tag) => tag["Key"] === "Name");
+                item["Name"] = Tags[index] ? Tags[index]["Value"] : "";
+                item["TransitGatewayCIDR"] = TransitGatewayCidrBlocks;
+                item["DnsSupport"] = DnsSupport;
+                transitGateways.push(item);
+            }
+            return transitGateways;
+        } else return [];
+    } catch (err) {
+        console.error(err);
+        return {
+            requestID: err.requestId,
+            statusCode: err.statusCode,
+            message: err.code,
+            time: err.time,
+        };
+    }
+};
+/**
+ * Fetch All VPN Connections
+ */
+const getAllVPNConnections = async () => {};
 networks.get("/vpc/all", async (req, res) => {
     try {
         const data = await getAllVpcs();
@@ -571,6 +741,40 @@ networks.get("/vpc:vpcId?", async (req, res) => {
             getAllComputeInstances(req.query.vpcId),
             getVpcPeeringConnection(req.query.vpcId),
         ]);
+        res.status(200).send(data);
+    } catch (err) {
+        res.send(err);
+    }
+});
+networks.get("/elb/all", async (req, res) => {
+    try {
+        const data = await getAllLoadBalancers();
+        res.status(200).send(data);
+    } catch (err) {
+        res.send(err);
+    }
+});
+networks.get("/transit/all", async (req, res) => {
+    try {
+        const data = await getAllTransitGateways();
+        res.status(200).send(data);
+    } catch (err) {
+        res.send(err);
+    }
+});
+networks.get("/rds:vpcId?", async (req, res) => {
+    try {
+        // const data = await getAllSecurityGroups(req.query.vpcId);
+        const data = await getAllRDSInstances(req.query.vpcId);
+        res.status(200).send(data);
+    } catch (err) {
+        res.send(err);
+    }
+});
+networks.get("/nacl:vpcId?", async (req, res) => {
+    try {
+        // const data = await getAllSecurityGroups(req.query.vpcId);
+        const data = await getNetworkACLs(req.query.vpcId);
         res.status(200).send(data);
     } catch (err) {
         res.send(err);
@@ -621,7 +825,7 @@ networks.get("/rds:vpcId?", async (req, res) => {
     }
 });
 networks.get("/rt:vpcId?", async (req, res) => {
-    console.log("I'm in RT");
+    // console.log("I'm in RT");
     try {
         const data = await getRouteTables(req.query.vpcId);
         res.status(200).send(data);
@@ -630,7 +834,7 @@ networks.get("/rt:vpcId?", async (req, res) => {
     }
 });
 networks.get("/nat:vpcId?", async (req, res) => {
-    console.log("I'm in NAT");
+    // console.log("I'm in NAT");
     try {
         const data = await getNatGateway(req.query.vpcId);
         res.status(200).send(data);
