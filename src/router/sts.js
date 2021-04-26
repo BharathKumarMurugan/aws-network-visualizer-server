@@ -4,7 +4,7 @@ import appConfig from "../config/appConfig";
 
 const sts = express.Router();
 
-const client = new AWS.STS({ apiVersion: appConfig._aws_api_version });
+const client = new AWS.STS({ apiVersion: appConfig._aws_sts_api_version});
 
 const getAccountId = async () => {
     const params = {};
