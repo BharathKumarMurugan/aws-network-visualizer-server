@@ -185,6 +185,8 @@ const getRouteTables = async (vpcID) => {
                             return r["VpcPeeringConnectionId"];
                         if ("GatewayId" in r) return r["GatewayId"];
                         if ("NatGatewayId" in r) return r["NatGatewayId"];
+                        if ("TransitGatewayId" in r)
+                            return r["TransitGatewayId"];
                         else return null;
                     });
                 };
@@ -460,7 +462,7 @@ const getNetworkACLs = async (vpcID) => {
                 };
                 item["EgressCount"] = countEgress();
                 item["IngressCount"] = countIngress();
-                console.log(item);
+                // console.log(item);
                 networkAcls.push(item);
             }
             return networkAcls;
@@ -575,6 +577,62 @@ const getVpcPeeringConnection = async (vpcID) => {
     }
 };
 /**
+ * Fetch All VPC Peering Connections
+ */
+const getAllVpcPeeringConnection = async (vpcID) => {
+    const params = {
+        DryRun: false,
+    };
+    try {
+        let {
+            VpcPeeringConnections: data,
+        } = await EC2.describeVpcPeeringConnections(params).promise();
+        let vpcPeeringList = [];
+        for (const {
+            VpcPeeringConnectionId,
+            Tags,
+            Status,
+            AccepterVpcInfo,
+            RequesterVpcInfo,
+        } of data) {
+            let item = {};
+            item["Status"] = Status["Code"];
+            item["Id"] = VpcPeeringConnectionId;
+            const index = Tags.findIndex((tag) => tag["Key"] === "Name");
+            item["Name"] = Tags[index] ? Tags[index]["Value"] : "";
+            const requesterCIDRs = () => {
+                return RequesterVpcInfo["CidrBlockSet"].map((req) => {
+                    return req["CidrBlock"];
+                });
+            };
+            const accepterCIDRs = () => {
+                return AccepterVpcInfo["CidrBlockSet"].map((req) => {
+                    return req["CidrBlock"];
+                });
+            };
+            item[
+                "RequesterVPC"
+            ] = `${RequesterVpcInfo["VpcId"]} (${RequesterVpcInfo["Region"]})`;
+            item["RequesterCIDR"] = requesterCIDRs();
+            item["Requester"] = RequesterVpcInfo["OwnerId"];
+            item[
+                "AccepterVPC"
+            ] = `${AccepterVpcInfo["VpcId"]} (${AccepterVpcInfo["Region"]})`;
+            item["AccepterCIDR"] = accepterCIDRs();
+            item["Accepter"] = AccepterVpcInfo["OwnerId"];
+            vpcPeeringList.push(item);
+        }
+        return vpcPeeringList;
+    } catch (err) {
+        return {
+            requestID: err.requestId,
+            statusCode: err.statusCode,
+            message: err.code,
+            time: err.time,
+        };
+    }
+};
+/**
  * Fetch all RDS within a VPC
  */
 const getAllRDSInstances = async (vpc_ID) => {
@@ -609,7 +667,7 @@ const getAllRDSInstances = async (vpc_ID) => {
             }
             // console.log("rds inside: ", rdsList);
         }
-        console.log("rds outside: ", rdsList);
+        // console.log("rds outside: ", rdsList);
         return rdsList.length > 0 ? rdsList : [];
     } catch (err) {
         console.error(err);
@@ -685,7 +743,6 @@ const getAllTransitGateways = async () => {
         let { TransitGateways: data } = await EC2.describeTransitGateways(
             params
         ).promise();
-        console.log("Transit: ", data);
         if (data.length > 0) {
             let transitGateways = [];
             for (const {
@@ -719,7 +776,49 @@ const getAllTransitGateways = async () => {
 /**
  * Fetch All VPN Connections
  */
-const getAllVPNConnections = async () => {};
+const getAllVPNConnections = async () => {
+    const params = {
+        DryRun: false,
+    };
+    let { VpnConnections: data } = await EC2.describeVpnConnections(
+        params
+    ).promise();
+    if (data.length > 0) {
+        let vpnList = [];
+        for (const {
+            VpnConnectionId,
+            VpnGatewayId,
+            Category,
+            Type,
+            CustomerGatewayId,
+            TransitGatewayId,
+            State,
+            Tags,
+            Routes,
+        } of data) {
+            let item = {};
+            item["State"] = State;
+            item["Id"] = VpnConnectionId;
+            const index = Tags.findIndex((tag) => tag["Key"] === "Name");
+            item["Name"] = Tags[index] ? Tags[index]["Value"] : "";
+            item["Type"] = Type;
+            item["Category"] = Category;
+            item["VpnGateway"] = VpnGatewayId ? VpnGatewayId : "";
+            item["CustomerGateway"] = CustomerGatewayId
+                ? CustomerGatewayId
+                : "";
+            item["TransitGateway"] = TransitGatewayId ? TransitGatewayId : "";
+            const routesCIDR = () => {
+                return Routes.map((r) => {
+                    return `${r["DestinationCidrBlock"]}, ${r["Source"]}, ${r["State"]}`;
+                });
+            };
+            item["Routes"] = routesCIDR();
+            vpnList.push(item);
+        }
+        return vpnList;
+    } else return [];
+};
 networks.get("/vpc/all", async (req, res) => {
     try {
         const data = await getAllVpcs();
@@ -762,6 +861,14 @@ networks.get("/transit/all", async (req, res) => {
         res.send(err);
     }
 });
+networks.get("/peer/all", async (req, res) => {
+    try {
+        const data = await getAllVpcPeeringConnection();
+        res.status(200).send(data);
+    } catch (err) {
+        res.send(err);
+    }
+});
 networks.get("/rds:vpcId?", async (req, res) => {
     try {
         // const data = await getAllSecurityGroups(req.query.vpcId);
@@ -775,6 +882,15 @@ networks.get("/nacl:vpcId?", async (req, res) => {
     try {
         // const data = await getAllSecurityGroups(req.query.vpcId);
         const data = await getNetworkACLs(req.query.vpcId);
+        res.status(200).send(data);
+    } catch (err) {
+        res.send(err);
+    }
+});
+networks.get("/vpn/all", async (req, res) => {
+    try {
+        // const data = await getAllSecurityGroups(req.query.vpcId);
+        const data = await getAllVPNConnections();
         res.status(200).send(data);
     } catch (err) {
         res.send(err);
